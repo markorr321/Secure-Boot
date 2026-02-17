@@ -1,0 +1,56 @@
+{
+  "location": "centralus",
+  "properties": {
+    "dataCollectionEndpointId": "DCE_RESOURCE_ID",
+    "streamDeclarations": {
+      "Custom-SecureBootInventory_CL": {
+        "columns": [
+          { "name": "TimeGenerated", "type": "datetime" },
+          { "name": "ManagedDeviceName", "type": "string" },
+          { "name": "ManagedDeviceID", "type": "string" },
+          { "name": "AzureADDeviceID", "type": "string" },
+          { "name": "ComputerName", "type": "string" },
+          { "name": "SecureBootEnabled", "type": "string" },
+          { "name": "UEFICA2023Status", "type": "string" },
+          { "name": "UEFICA2023Error", "type": "string" },
+          { "name": "UEFICA2023ErrorEvent", "type": "string" },
+          { "name": "AvailableUpdates", "type": "string" },
+          { "name": "HighConfidenceOptOut", "type": "string" },
+          { "name": "OEMManufacturerName", "type": "string" },
+          { "name": "OEMModelSystemFamily", "type": "string" },
+          { "name": "OEMModelNumber", "type": "string" },
+          { "name": "FirmwareVersion", "type": "string" },
+          { "name": "FirmwareReleaseDate", "type": "string" },
+          { "name": "OSArchitecture", "type": "string" },
+          { "name": "CanAttemptUpdateAfter", "type": "string" },
+          { "name": "LatestEventId", "type": "string" },
+          { "name": "BucketId", "type": "string" },
+          { "name": "Confidence", "type": "string" },
+          { "name": "Event1801Count", "type": "string" },
+          { "name": "Event1808Count", "type": "string" },
+          { "name": "OSVersion", "type": "string" },
+          { "name": "LastBootTime", "type": "string" },
+          { "name": "BaseBoardManufacturer", "type": "string" },
+          { "name": "BaseBoardProduct", "type": "string" },
+          { "name": "IsCompliant", "type": "string" }
+        ]
+      }
+    },
+    "dataFlows": [
+      {
+        "streams": ["Custom-SecureBootInventory_CL"],
+        "destinations": ["logAnalyticsWorkspace"],
+        "transformKql": "source | extend TimeGenerated = now()",
+        "outputStream": "Custom-SecureBootInventory_CL"
+      }
+    ],
+    "destinations": {
+      "logAnalytics": [
+        {
+          "workspaceResourceId": "WORKSPACE_RESOURCE_ID",
+          "name": "logAnalyticsWorkspace"
+        }
+      ]
+    }
+  }
+}

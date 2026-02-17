@@ -1,0 +1,10 @@
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/function-deploy.zip
+terraform/body.json
+terraform/.terraform.lock.hcl
+
+# Function App
+SecureBootFunction/local.settings.json

@@ -1,0 +1,445 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Secure Boot Compliance Dashboard\n\nThis workbook provides fleet-wide visibility into Secure Boot status and UEFI CA 2023 certificate deployment across managed Windows devices.\n\n**KB Reference:** [Secure Boot certificate expiration and CA updates](https://support.microsoft.com/en-us/topic/windows-secure-boot-certificate-expiration-and-ca-updates-7ff40d33-95dc-4c3c-8725-a9b95457578e)"
+      },
+      "name": "header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "time-range",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 2592000000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                { "durationMs": 86400000 },
+                { "durationMs": 604800000 },
+                { "durationMs": 1209600000 },
+                { "durationMs": 2592000000 }
+              ]
+            },
+            "label": "Time Range"
+          },
+          {
+            "id": "device-filter",
+            "version": "KqlParameterItem/1.0",
+            "name": "DeviceName",
+            "type": 1,
+            "value": "All devices",
+            "label": "Device Name"
+          }
+        ],
+        "style": "pills",
+        "queryType": 0
+      },
+      "name": "parameters"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Compliance Overview"
+      },
+      "name": "section-overview"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize Compliant = countif(IsCompliant == \"True\"), NonCompliant = countif(IsCompliant != \"True\")\r\n| extend Total = Compliant + NonCompliant\r\n| extend ComplianceRate = round(todouble(Compliant) / todouble(Total) * 100, 1)\r\n| project Metric = 'Compliant Devices', Value = tostring(Compliant), Detail = strcat(tostring(ComplianceRate), '% compliance rate')\r\n| union (\r\nSecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize Compliant = countif(IsCompliant == \"True\"), NonCompliant = countif(IsCompliant != \"True\")\r\n| extend Total = Compliant + NonCompliant\r\n| project Metric = 'Non-Compliant Devices', Value = tostring(NonCompliant), Detail = strcat(tostring(Total), ' total devices')\r\n)",
+        "size": 4,
+        "title": "Compliance Summary",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "Metric",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "auto"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 0
+              }
+            }
+          },
+          "secondaryContent": {
+            "columnMatch": "Detail",
+            "formatter": 1
+          },
+          "showBorder": true
+        }
+      },
+      "name": "compliance-summary"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize count() by IsCompliant\r\n| extend Label = iff(IsCompliant == \"True\", \"Compliant\", \"Non-Compliant\")\r\n| project Label, count_",
+        "size": 2,
+        "title": "Compliance Status",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "piechart",
+        "chartSettings": {
+          "seriesLabelSettings": [
+            { "seriesName": "Compliant", "color": "green" },
+            { "seriesName": "Non-Compliant", "color": "red" }
+          ]
+        }
+      },
+      "customWidth": "50",
+      "name": "compliance-pie"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize count() by UEFICA2023Status\r\n| extend Status = iff(isempty(UEFICA2023Status) or UEFICA2023Status == \"\", \"Unknown\", UEFICA2023Status)\r\n| project Status, count_",
+        "size": 2,
+        "title": "UEFI CA 2023 Certificate Status",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "piechart",
+        "chartSettings": {
+          "seriesLabelSettings": [
+            { "seriesName": "Updated", "color": "green" },
+            { "seriesName": "NotStarted", "color": "orange" },
+            { "seriesName": "InProgress", "color": "blue" },
+            { "seriesName": "Failed", "color": "red" },
+            { "seriesName": "Unknown", "color": "gray" }
+          ]
+        }
+      },
+      "customWidth": "50",
+      "name": "cert-status-pie"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Secure Boot Status"
+      },
+      "name": "section-secureboot"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize count() by SecureBootEnabled\r\n| extend Label = case(SecureBootEnabled == \"True\", \"Enabled\", SecureBootEnabled == \"False\", \"Disabled\", \"Unknown\")\r\n| project Label, count_",
+        "size": 2,
+        "title": "Secure Boot Enabled/Disabled",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "piechart",
+        "chartSettings": {
+          "seriesLabelSettings": [
+            { "seriesName": "Enabled", "color": "green" },
+            { "seriesName": "Disabled", "color": "red" },
+            { "seriesName": "Unknown", "color": "gray" }
+          ]
+        }
+      },
+      "customWidth": "50",
+      "name": "secureboot-enabled-pie"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize count() by OEMManufacturerName\r\n| extend Manufacturer = iff(isempty(OEMManufacturerName) or OEMManufacturerName == \"\", \"Unknown\", OEMManufacturerName)\r\n| project Manufacturer, count_\r\n| sort by count_ desc",
+        "size": 2,
+        "title": "Devices by Manufacturer",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "piechart"
+      },
+      "customWidth": "50",
+      "name": "manufacturer-pie"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Compliance Trend"
+      },
+      "name": "section-trend"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName, bin(TimeGenerated, 1d)\r\n| summarize Compliant = countif(IsCompliant == \"True\"), NonCompliant = countif(IsCompliant != \"True\") by bin(TimeGenerated, 1d)\r\n| sort by TimeGenerated asc",
+        "size": 0,
+        "title": "Compliance Trend Over Time",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "areachart",
+        "chartSettings": {
+          "seriesLabelSettings": [
+            { "seriesName": "Compliant", "color": "green" },
+            { "seriesName": "NonCompliant", "color": "red" }
+          ]
+        }
+      },
+      "name": "compliance-trend"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Device Details"
+      },
+      "name": "section-details"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| where \"{DeviceName:escape}\" =~ \"*\" or ComputerName contains \"{DeviceName:escape}\" or \"{DeviceName:escape}\" =~ \"All devices\"\r\n| project ComputerName, SecureBootEnabled, UEFICA2023Status, IsCompliant, OEMManufacturerName, OEMModelSystemFamily, FirmwareVersion, OSVersion, OSArchitecture, TimeGenerated\r\n| sort by IsCompliant asc, ComputerName asc",
+        "size": 0,
+        "title": "All Devices - Secure Boot Status",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "table",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "IsCompliant",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  { "operator": "==", "thresholdValue": "True", "representation": "success", "text": "Compliant" },
+                  { "operator": "Default", "representation": "error", "text": "Non-Compliant" }
+                ]
+              }
+            },
+            {
+              "columnMatch": "SecureBootEnabled",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  { "operator": "==", "thresholdValue": "True", "representation": "success", "text": "Enabled" },
+                  { "operator": "Default", "representation": "warning", "text": "Disabled" }
+                ]
+              }
+            },
+            {
+              "columnMatch": "UEFICA2023Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  { "operator": "==", "thresholdValue": "Updated", "representation": "success", "text": "Updated" },
+                  { "operator": "==", "thresholdValue": "InProgress", "representation": "pending", "text": "In Progress" },
+                  { "operator": "==", "thresholdValue": "Failed", "representation": "error", "text": "Failed" },
+                  { "operator": "Default", "representation": "warning", "text": "{0}" }
+                ]
+              }
+            }
+          ],
+          "filter": true,
+          "sortBy": [
+            { "itemKey": "IsCompliant", "sortOrder": 1 }
+          ]
+        }
+      },
+      "name": "device-details-grid"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Non-Compliant Devices"
+      },
+      "name": "section-noncompliant"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| where IsCompliant != \"True\"\r\n| project ComputerName, SecureBootEnabled, UEFICA2023Status, UEFICA2023Error, AvailableUpdates, OEMManufacturerName, OEMModelNumber, FirmwareVersion, FirmwareReleaseDate, LatestEventId, BucketId, Event1801Count, Event1808Count, TimeGenerated\r\n| sort by ComputerName asc",
+        "size": 0,
+        "title": "Non-Compliant Devices - Detailed View",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "table",
+        "gridSettings": {
+          "filter": true
+        }
+      },
+      "name": "noncompliant-details"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Error Analysis"
+      },
+      "name": "section-errors"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| where UEFICA2023Status == \"Failed\" or isnotempty(UEFICA2023Error)\r\n| project ComputerName, UEFICA2023Status, UEFICA2023Error, UEFICA2023ErrorEvent, BucketId, Confidence, Event1808Count, OEMManufacturerName, OEMModelNumber, FirmwareVersion, TimeGenerated\r\n| sort by ComputerName asc",
+        "size": 0,
+        "title": "Devices with Certificate Update Errors",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "table",
+        "gridSettings": {
+          "filter": true
+        }
+      },
+      "name": "error-details"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Firmware Analysis"
+      },
+      "name": "section-firmware"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| summarize DeviceCount = count(), Compliant = countif(IsCompliant == \"True\"), NonCompliant = countif(IsCompliant != \"True\") by OEMManufacturerName, OEMModelSystemFamily, FirmwareVersion\r\n| extend ComplianceRate = round(todouble(Compliant) / todouble(DeviceCount) * 100, 1)\r\n| sort by OEMManufacturerName asc, ComplianceRate asc",
+        "size": 0,
+        "title": "Compliance by Manufacturer / Model / Firmware",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "table",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "ComplianceRate",
+              "formatter": 8,
+              "formatOptions": {
+                "min": 0,
+                "max": 100,
+                "palette": "redGreen"
+              }
+            }
+          ],
+          "filter": true
+        }
+      },
+      "name": "firmware-analysis"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Export Data\nClick the **Download as csv** or **Open in Excel** button below to export all device inventory data."
+      },
+      "name": "section-export"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecureBootInventory_CL\r\n| summarize arg_max(TimeGenerated, *) by ComputerName\r\n| project ComputerName, ManagedDeviceName, ManagedDeviceID, AzureADDeviceID, SecureBootEnabled, UEFICA2023Status, UEFICA2023Error, IsCompliant, AvailableUpdates, OEMManufacturerName, OEMModelSystemFamily, OEMModelNumber, FirmwareVersion, FirmwareReleaseDate, OSVersion, OSArchitecture, LastBootTime, BaseBoardManufacturer, BaseBoardProduct, LatestEventId, BucketId, Confidence, Event1801Count, Event1808Count, TimeGenerated\r\n| sort by ComputerName asc",
+        "size": 1,
+        "title": "Full Device Inventory Export",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "table",
+        "showExportToExcel": true,
+        "gridSettings": {
+          "filter": true
+        }
+      },
+      "name": "export-data"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Billing"
+      },
+      "name": "section-billing"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Usage\r\n| where DataType == \"SecureBootInventory_CL\"\r\n| summarize BillableDataMB = round(sum(Quantity), 2) by bin(TimeGenerated, 1d), DataType\r\n| sort by TimeGenerated desc",
+        "size": 0,
+        "title": "Data Ingestion (Billable MB/day)",
+        "timeContext": {
+          "durationMs": 2592000000
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "visualization": "table"
+      },
+      "name": "billing"
+    }
+  ],
+  "fallbackResourceIds": [
+    "WORKSPACE_RESOURCE_ID"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
