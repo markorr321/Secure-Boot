@@ -125,13 +125,17 @@ Deploy `Reporting/SecureBoot/Secure_Boot_Compliance.workbook` via Azure Portal o
 #### Step 14: Update Client Script
 Set `$AzureFunctionURL` in `Invoke-SecureBootCollection.ps1` to your function URL.
 
-## Testing
+## Usage
 
-1. Run the client script as Administrator in Windows PowerShell 5.1:
-   ```powershell
-   .\Invoke-SecureBootCollection.ps1
-   ```
-   Expected output: `CollectionDate:DD-MM HH:mm OK: SecureBootInventory 200`
+`Invoke-SecureBootCollection.ps1` is intended to be deployed as an Intune Proactive Remediation detection script. It can also be run locally for testing purposes.
+
+### Local Testing
+
+Run the client script as Administrator in Windows PowerShell 5.1:
+```powershell
+.\Invoke-SecureBootCollection.ps1
+```
+Expected output: `CollectionDate:DD-MM HH:mm OK: SecureBootInventory 200`
 
 2. Query data after ~5 minutes:
    ```kql
