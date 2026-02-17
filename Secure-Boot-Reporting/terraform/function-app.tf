@@ -8,7 +8,9 @@ resource "azurerm_storage_account" "func" {
 }
 
 # --- App Service Plan (Consumption) ---
+# Skipped when an existing plan is provided via var.existing_service_plan_id
 resource "azurerm_service_plan" "func" {
+  count               = var.existing_service_plan_id == null ? 1 : 0
   name                = "asp-${var.project_name}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
@@ -21,9 +23,10 @@ resource "azurerm_windows_function_app" "main" {
   name                       = local.func_name
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
-  service_plan_id            = azurerm_service_plan.func.id
+  service_plan_id            = var.existing_service_plan_id != null ? var.existing_service_plan_id : azurerm_service_plan.func[0].id
   storage_account_name       = azurerm_storage_account.func.name
   storage_account_access_key = azurerm_storage_account.func.primary_access_key
+  virtual_network_subnet_id  = var.subnet_id
 
   identity {
     type = "SystemAssigned"

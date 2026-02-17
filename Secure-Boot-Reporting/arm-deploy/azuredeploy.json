@@ -1,0 +1,296 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
+    },
+    "projectName": {
+      "type": "string",
+      "defaultValue": "secure-boot-reporting",
+      "metadata": {
+        "description": "Project name used to derive resource names"
+      }
+    }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id)]",
+    "lawName": "[format('law-{0}', parameters('projectName'))]",
+    "dceName": "dce-secureboot",
+    "dcrName": "dcr-secureboot",
+    "storageName": "[format('stsecboot{0}', take(variables('suffix'), 8))]",
+    "aspName": "[format('asp-{0}', parameters('projectName'))]",
+    "funcName": "[format('func-{0}-{1}', parameters('projectName'), take(variables('suffix'), 8))]",
+    "tableName": "SecureBootInventory_CL",
+    "streamName": "Custom-SecureBootInventory_CL",
+    "tableColumns": [
+      { "name": "TimeGenerated", "type": "dateTime" },
+      { "name": "ManagedDeviceName", "type": "string" },
+      { "name": "ManagedDeviceID", "type": "string" },
+      { "name": "AzureADDeviceID", "type": "string" },
+      { "name": "ComputerName", "type": "string" },
+      { "name": "SecureBootEnabled", "type": "string" },
+      { "name": "UEFICA2023Status", "type": "string" },
+      { "name": "UEFICA2023Error", "type": "string" },
+      { "name": "UEFICA2023ErrorEvent", "type": "string" },
+      { "name": "AvailableUpdates", "type": "string" },
+      { "name": "HighConfidenceOptOut", "type": "string" },
+      { "name": "OEMManufacturerName", "type": "string" },
+      { "name": "OEMModelSystemFamily", "type": "string" },
+      { "name": "OEMModelNumber", "type": "string" },
+      { "name": "FirmwareVersion", "type": "string" },
+      { "name": "FirmwareReleaseDate", "type": "string" },
+      { "name": "OSArchitecture", "type": "string" },
+      { "name": "CanAttemptUpdateAfter", "type": "string" },
+      { "name": "LatestEventId", "type": "string" },
+      { "name": "BucketId", "type": "string" },
+      { "name": "Confidence", "type": "string" },
+      { "name": "Event1801Count", "type": "string" },
+      { "name": "Event1808Count", "type": "string" },
+      { "name": "OSVersion", "type": "string" },
+      { "name": "LastBootTime", "type": "string" },
+      { "name": "BaseBoardManufacturer", "type": "string" },
+      { "name": "BaseBoardProduct", "type": "string" },
+      { "name": "IsCompliant", "type": "string" }
+    ],
+    "streamColumns": [
+      { "name": "TimeGenerated", "type": "datetime" },
+      { "name": "ManagedDeviceName", "type": "string" },
+      { "name": "ManagedDeviceID", "type": "string" },
+      { "name": "AzureADDeviceID", "type": "string" },
+      { "name": "ComputerName", "type": "string" },
+      { "name": "SecureBootEnabled", "type": "string" },
+      { "name": "UEFICA2023Status", "type": "string" },
+      { "name": "UEFICA2023Error", "type": "string" },
+      { "name": "UEFICA2023ErrorEvent", "type": "string" },
+      { "name": "AvailableUpdates", "type": "string" },
+      { "name": "HighConfidenceOptOut", "type": "string" },
+      { "name": "OEMManufacturerName", "type": "string" },
+      { "name": "OEMModelSystemFamily", "type": "string" },
+      { "name": "OEMModelNumber", "type": "string" },
+      { "name": "FirmwareVersion", "type": "string" },
+      { "name": "FirmwareReleaseDate", "type": "string" },
+      { "name": "OSArchitecture", "type": "string" },
+      { "name": "CanAttemptUpdateAfter", "type": "string" },
+      { "name": "LatestEventId", "type": "string" },
+      { "name": "BucketId", "type": "string" },
+      { "name": "Confidence", "type": "string" },
+      { "name": "Event1801Count", "type": "string" },
+      { "name": "Event1808Count", "type": "string" },
+      { "name": "OSVersion", "type": "string" },
+      { "name": "LastBootTime", "type": "string" },
+      { "name": "BaseBoardManufacturer", "type": "string" },
+      { "name": "BaseBoardProduct", "type": "string" },
+      { "name": "IsCompliant", "type": "string" }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[variables('lawName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[format('{0}/{1}', variables('lawName'), variables('tableName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('lawName'))]"
+      ],
+      "properties": {
+        "schema": {
+          "name": "[variables('tableName')]",
+          "columns": "[variables('tableColumns')]"
+        },
+        "retentionInDays": 30,
+        "totalRetentionInDays": 30,
+        "plan": "Analytics"
+      }
+    },
+    {
+      "type": "Microsoft.Insights/dataCollectionEndpoints",
+      "apiVersion": "2022-06-01",
+      "name": "[variables('dceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "networkAcls": {
+          "publicNetworkAccess": "Enabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/dataCollectionRules",
+      "apiVersion": "2022-06-01",
+      "name": "[variables('dcrName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dceName'))]",
+        "[resourceId('Microsoft.OperationalInsights/workspaces/tables', variables('lawName'), variables('tableName'))]"
+      ],
+      "properties": {
+        "dataCollectionEndpointId": "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dceName'))]",
+        "streamDeclarations": {
+          "Custom-SecureBootInventory_CL": {
+            "columns": "[variables('streamColumns')]"
+          }
+        },
+        "dataFlows": [
+          {
+            "streams": [ "Custom-SecureBootInventory_CL" ],
+            "destinations": [ "logAnalyticsWorkspace" ],
+            "transformKql": "source | extend TimeGenerated = now()",
+            "outputStream": "Custom-SecureBootInventory_CL"
+          }
+        ],
+        "destinations": {
+          "logAnalytics": [
+            {
+              "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('lawName'))]",
+              "name": "logAnalyticsWorkspace"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('storageName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2"
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('aspName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Y1",
+        "tier": "Dynamic"
+      },
+      "properties": {
+        "reserved": false
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('funcName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('aspName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]",
+        "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dceName'))]",
+        "[resourceId('Microsoft.Insights/dataCollectionRules', variables('dcrName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('aspName'))]",
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};EndpointSuffix={1};AccountKey={2}', variables('storageName'), environment().suffixes.storage, listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2023-01-01').keys[0].value)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};EndpointSuffix={1};AccountKey={2}', variables('storageName'), environment().suffixes.storage, listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2023-01-01').keys[0].value)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[toLower(variables('funcName'))]"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "powershell"
+            },
+            {
+              "name": "DCE_ENDPOINT",
+              "value": "[reference(resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dceName'))).logsIngestion.endpoint]"
+            },
+            {
+              "name": "DCR_IMMUTABLE_ID",
+              "value": "[reference(resourceId('Microsoft.Insights/dataCollectionRules', variables('dcrName'))).immutableId]"
+            },
+            {
+              "name": "SECUREBOOT_STREAM_NAME",
+              "value": "[variables('streamName')]"
+            },
+            {
+              "name": "PROJECT",
+              "value": "Secure-Boot-Reporting/SecureBootFunction"
+            }
+          ],
+          "powerShellVersion": "7.4"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.Insights/dataCollectionRules', variables('dcrName')), resourceId('Microsoft.Web/sites', variables('funcName')), '3913510d-42f4-4e42-8a64-420c390055eb')]",
+      "scope": "[resourceId('Microsoft.Insights/dataCollectionRules', variables('dcrName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('funcName'))]",
+        "[resourceId('Microsoft.Insights/dataCollectionRules', variables('dcrName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '3913510d-42f4-4e42-8a64-420c390055eb')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('funcName')), '2023-01-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites/sourcecontrols",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/web', variables('funcName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('funcName'))]"
+      ],
+      "properties": {
+        "repoUrl": "https://github.com/markorr321/Secure-Boot",
+        "branch": "main",
+        "isManualIntegration": true
+      }
+    }
+  ],
+  "outputs": {
+    "functionUrl": {
+      "type": "string",
+      "value": "[format('https://{0}/api/logcollectorapi', reference(resourceId('Microsoft.Web/sites', variables('funcName'))).defaultHostName)]"
+    },
+    "functionAppName": {
+      "type": "string",
+      "value": "[variables('funcName')]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "value": "[resourceGroup().name]"
+    },
+    "workspaceName": {
+      "type": "string",
+      "value": "[variables('lawName')]"
+    }
+  }
+}

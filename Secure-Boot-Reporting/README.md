@@ -23,6 +23,14 @@ Azure Function (PowerShell, Managed Identity)
 
 ## Deployment
 
+### Quick Deploy
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmarkorr321%2FSecure-Boot%2Fmain%2FSecure-Boot-Reporting%2Farm-deploy%2Fazuredeploy.json)
+
+Deploys all infrastructure and function code (Log Analytics, DCE, DCR, Function App) to your Azure subscription. After deployment, you still need to:
+1. Grant the Function App's managed identity `Device.Read.All` via Graph API (see Step 12 below)
+2. Update `Invoke-SecureBootCollection.ps1` with the Function URL from the deployment outputs
+
 ### Option A: Terraform (Recommended)
 
 ```powershell
@@ -33,6 +41,25 @@ terraform apply -var="subscription_id=YOUR-SUB-ID"
 ```
 
 Update `Invoke-SecureBootCollection.ps1` with the `function_url` output.
+
+#### Using an Existing App Service Plan or ASE
+
+To deploy onto an existing App Service Plan (including ASE-linked plans), pass the plan's resource ID. This skips creating a new consumption plan.
+
+```powershell
+terraform apply -var="subscription_id=YOUR-SUB-ID" -var="existing_service_plan_id=/subscriptions/YOUR-SUB-ID/resourceGroups/YOUR-RG/providers/Microsoft.Web/serverfarms/YOUR-PLAN"
+```
+
+For ASE or private network deployments, also provide a subnet ID for VNet integration:
+
+```powershell
+terraform apply -var="subscription_id=YOUR-SUB-ID" -var="existing_service_plan_id=/subscriptions/.../serverfarms/YOUR-PLAN" -var="subnet_id=/subscriptions/.../subnets/YOUR-SUBNET"
+```
+
+| Variable | Description | Default |
+|---|---|---|
+| `existing_service_plan_id` | Resource ID of an existing App Service Plan or ASE-linked plan | `null` (creates a consumption plan) |
+| `subnet_id` | Resource ID of a subnet for VNet integration | `null` (no VNet integration) |
 
 ### Option B: Azure CLI (Step-by-Step)
 
