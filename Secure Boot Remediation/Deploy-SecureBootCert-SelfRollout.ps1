@@ -93,7 +93,7 @@ INTUNE PROACTIVE REMEDIATION WORKFLOW:
 # =============================================================================
 
 # Create timestamped log folder and file
-$ScriptName = "Secure-Boot-Remediation"
+$ScriptName = "Secure-Boot-Certificate-Update"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $LogFolder = Join-Path -Path "C:\Windows\Temp" -ChildPath "${ScriptName}_${Timestamp}"
 $LogFile = Join-Path -Path $LogFolder -ChildPath "logfile_${Timestamp}.log"
@@ -149,7 +149,7 @@ function Write-Log {
 
 # Initialize log file
 Write-Log -Message "========================================" -Level SECTION
-Write-Log -Message "Secure Boot Certificate Remediation Script" -Level SECTION
+Write-Log -Message "Secure Boot Certificate Update Script" -Level SECTION
 Write-Log -Message "Started: $(Get-Date -Format 'dddd, MMMM dd, yyyy HH:mm:ss')" -Level SECTION
 Write-Log -Message "Log File: $LogFile" -Level INFO
 Write-Log -Message "========================================" -Level SECTION
@@ -206,7 +206,7 @@ try {
     switch ($currentStatus) {
         "Updated" {
             Write-Log -Message "INFO: Certificates are already UPDATED" -Level INFO
-            Write-Log -Message "This remediation may not be necessary, but will proceed to ensure consistency" -Level INFO
+            Write-Log -Message "This update may not be necessary, but will proceed to ensure consistency" -Level INFO
         }
         "InProgress" {
             Write-Log -Message "INFO: Certificate update is already IN PROGRESS" -Level INFO
@@ -214,11 +214,11 @@ try {
         }
         "NotStarted" {
             Write-Log -Message "GOOD: Certificate update has NOT been started yet" -Level SUCCESS
-            Write-Log -Message "This remediation is needed and will trigger the update process" -Level INFO
+            Write-Log -Message "This update is needed and will trigger the update process" -Level INFO
         }
         "Failed" {
             Write-Log -Message "WARNING: Previous update attempt FAILED" -Level WARNING
-            Write-Log -Message "This remediation will retry the certificate update" -Level INFO
+            Write-Log -Message "This script will retry the certificate update" -Level INFO
         }
         default {
             Write-Log -Message "Status: $currentStatus (unknown state)" -Level WARNING
@@ -235,7 +235,7 @@ Write-Log -Message ""
 # =============================================================================
 
 Write-Log -Message "========================================" -Level SECTION
-Write-Log -Message "APPLYING REMEDIATION" -Level SECTION
+Write-Log -Message "APPLYING UPDATE" -Level SECTION
 Write-Log -Message "========================================" -Level SECTION
 Write-Log -Message ""
 
@@ -314,7 +314,7 @@ try {
         Write-Log -Message "SUCCESS: Verification passed!" -Level SUCCESS
         Write-Log -Message "Registry value confirmed: $verifyValue (decimal) = 0x$($verifyValue.ToString('X')) (hex)" -Level SUCCESS
         Write-Log -Message "Expected value:           $ValueData (decimal) = 0x$($ValueData.ToString('X')) (hex)" -Level INFO
-        Write-Log -Message "✓ Values match - remediation successful!" -Level SUCCESS
+        Write-Log -Message "✓ Values match - update successful!" -Level SUCCESS
     } else {
         Write-Log -Message "ERROR: Verification failed - values do not match!" -Level ERROR
         Write-Log -Message "Expected: $ValueData, Got: $verifyValue" -Level ERROR
@@ -416,15 +416,15 @@ Write-Log -Message "  • Result: Device can immediately attempt update on next 
 Write-Log -Message ""
 
 # =============================================================================
-# REMEDIATION SUMMARY
+# UPDATE SUMMARY
 # =============================================================================
 
 Write-Log -Message "========================================" -Level SECTION
-Write-Log -Message "REMEDIATION SUMMARY" -Level SECTION
+Write-Log -Message "UPDATE SUMMARY" -Level SECTION
 Write-Log -Message "========================================" -Level SECTION
 Write-Log -Message ""
 
-Write-Log -Message "✓ REMEDIATION COMPLETED SUCCESSFULLY" -Level SUCCESS
+Write-Log -Message "✓ UPDATE COMPLETED SUCCESSFULLY" -Level SUCCESS
 Write-Log -Message ""
 Write-Log -Message "What was done:" -Level INFO
 Write-Log -Message "  1. ✓ Verified administrator privileges" -Level SUCCESS
@@ -466,7 +466,7 @@ Write-Log -Message "  3. Verify Event ID 1801 appears in System event log" -Leve
 Write-Log -Message "  4. Confirm detection script exits with code 0 (compliant)" -Level INFO
 Write-Log -Message ""
 
-Write-Log -Message "Exit Code: 0 (Remediation successful)" -Level SUCCESS
+Write-Log -Message "Exit Code: 0 (Update successful)" -Level SUCCESS
 Write-Log -Message "Completed: $(Get-Date -Format 'dddd, MMMM dd, yyyy HH:mm:ss')" -Level INFO
 Write-Log -Message "Log saved to: $LogFile" -Level INFO
 Write-Log -Message "========================================" -Level SECTION

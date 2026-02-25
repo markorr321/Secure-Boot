@@ -25,6 +25,7 @@ This toolkit helps ensure your systems:
 | `Remediate-SecureBootConfig.ps1` | Applies required registry settings and telemetry configuration to support the 2026 certificate updates |
 | `Export-SecureBootStatusReport.ps1` | Logs current certificate readiness status and firmware version to a CSV file |
 | `Check-OEMFirmwareReadiness.ps1` | Captures manufacturer, model, and BIOS/UEFI firmware version for inventory or compliance tracking |
+| `Get-IntuneSecureBootReport.ps1` | Retrieves Secure Boot compliance data from Intune via Microsoft Graph API and generates an HTML report |
 
 ---
 
@@ -41,6 +42,32 @@ Execute `Export-SecureBootStatusReport.ps1` on multiple machines and collect out
 
 ### Firmware Audit
 Use `Check-OEMFirmwareReadiness.ps1` to compare firmware versions against OEM baselines.
+
+### Intune Report (API)
+Use `Get-IntuneSecureBootReport.ps1` to pull Secure Boot status from all Intune-managed devices and generate a professional HTML report.
+
+```powershell
+# Interactive authentication (recommended for testing)
+.\Get-IntuneSecureBootReport.ps1 -Interactive
+
+# App authentication with client secret (for automation)
+.\Get-IntuneSecureBootReport.ps1 -TenantId "your-tenant-id" -ClientId "your-client-id" -ClientSecret "your-secret"
+
+# App authentication with certificate (most secure for automation)
+.\Get-IntuneSecureBootReport.ps1 -TenantId "your-tenant-id" -ClientId "your-client-id" -CertificateThumbprint "your-thumbprint"
+```
+
+#### Required Graph API Permissions
+- `DeviceManagementManagedDevices.Read.All`
+- `DeviceManagementConfiguration.Read.All`
+
+#### App Registration Setup (for automation)
+1. Go to **Azure Portal** > **Azure Active Directory** > **App registrations**
+2. Create a new registration
+3. Add API permissions: **Microsoft Graph** > **Application permissions**
+4. Add: `DeviceManagementManagedDevices.Read.All`
+5. Grant admin consent
+6. Create a client secret or upload a certificate
 
 ---
 
