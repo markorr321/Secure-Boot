@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Detects Secure Boot certificate update status for fleet-wide monitoring.
 
@@ -7,10 +7,10 @@
     and device information. It outputs a JSON string for monitoring and reporting.
 
     Compatible with Intune Remediations, GPO-based collection, and other management tools.
-    No remediation script is needed — this is monitoring only.
+    No remediation script is needed - this is monitoring only.
 
     Exit 0 = "Without issue"  (certificates updated)
-    Exit 1 = "With issue"     (certificates not updated — informational only)
+    Exit 1 = "With issue"     (certificates not updated - informational only)
 
 .PARAMETER OutputPath
     Optional. Path to a folder where the JSON file will be saved.
@@ -48,10 +48,10 @@ param(
 # =============================================================================
 
 # Create timestamped log folder and file
-$ScriptName = "Detect-SecureBootCertUpdateStatus"
+$ScriptName = "PAM - Secure Boot - UEFI CA 2023 Inventory Collection"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
-$LogFolder = Join-Path -Path "C:\Windows\Temp" -ChildPath "${ScriptName}_${Timestamp}"
-$LogFile = Join-Path -Path $LogFolder -ChildPath "logfile_${Timestamp}.log"
+$LogFolder = Join-Path -Path $env:ProgramData -ChildPath $ScriptName
+$LogFile = Join-Path -Path $LogFolder -ChildPath "Detection.log"
 
 # Create log directory if it doesn't exist
 try {
@@ -459,7 +459,7 @@ Write-Log -Message "STEP 15: Checking CanAttemptUpdateAfter" -Level SECTION
 try {
     $regValue = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing\DeviceAttributes" -Name CanAttemptUpdateAfter -ErrorAction Stop
     $canAttemptUpdateAfter = $regValue.CanAttemptUpdateAfter
-    # Convert FILETIME to UTC DateTime — registry stores as REG_BINARY (byte[]) or REG_QWORD (long)
+    # Convert FILETIME to UTC DateTime - registry stores as REG_BINARY (byte[]) or REG_QWORD (long)
     if ($null -ne $canAttemptUpdateAfter) {
         try {
             if ($canAttemptUpdateAfter -is [byte[]]) {

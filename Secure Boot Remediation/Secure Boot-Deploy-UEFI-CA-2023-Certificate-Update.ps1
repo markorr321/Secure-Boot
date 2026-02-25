@@ -1,6 +1,6 @@
-# Secure Boot Certificate Update - Sets AvailableUpdates=0x5944 and bypasses throttle
+﻿# Secure Boot Certificate Update - Sets AvailableUpdates=0x5944 and bypasses throttle
 
-$ScriptName = "Secure-Boot-Certificate-Update"
+$ScriptName = "PAM - Secure Boot - Deploy UEFI CA 2023 Certificate Update"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $LogFolder = Join-Path -Path $env:ProgramData -ChildPath $ScriptName
 $LogFile = Join-Path -Path $LogFolder -ChildPath "Remediation.log"
@@ -57,24 +57,8 @@ Write-Log -Message "PRE-FLIGHT CHECKS" -Level SECTION
 Write-Log -Message "========================================" -Level SECTION
 Write-Log -Message ""
 
-# Check 1: Administrator Privileges
-Write-Log -Message "STEP 1: Verifying Administrator Privileges" -Level SECTION
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if ($isAdmin) {
-    Write-Log -Message "SUCCESS: Script is running with Administrator privileges" -Level SUCCESS
-    Write-Log -Message "Registry modifications will be permitted" -Level INFO
-} else {
-    Write-Log -Message "ERROR: Script is NOT running as Administrator" -Level ERROR
-    Write-Log -Message "Registry modifications require elevated privileges" -Level ERROR
-    Write-Log -Message "Please run this script as Administrator" -Level ERROR
-    Write-Log -Message "Exiting with error code 1" -Level ERROR
-    Write-Output "ERROR: Not running as Administrator. Log: $LogFile"
-    exit 1
-}
-Write-Log -Message ""
-
-# Check 2: Check current Secure Boot status
-Write-Log -Message "STEP 2: Checking Current Secure Boot Configuration" -Level SECTION
+# Check 1: Check current Secure Boot status
+Write-Log -Message "STEP 1: Checking Current Secure Boot Configuration" -Level SECTION
 try {
     $secureBootEnabled = Confirm-SecureBootUEFI -ErrorAction Stop
     if ($secureBootEnabled) {
@@ -91,8 +75,8 @@ try {
 }
 Write-Log -Message ""
 
-# Check 3: Check if update is already pending or completed
-Write-Log -Message "STEP 3: Checking Current Certificate Update Status" -Level SECTION
+# Check 2: Check if update is already pending or completed
+Write-Log -Message "STEP 2: Checking Current Certificate Update Status" -Level SECTION
 try {
     $currentStatus = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" -Name UEFICA2023Status -ErrorAction Stop).UEFICA2023Status
     Write-Log -Message "Current UEFI CA 2023 Status: $currentStatus" -Level INFO
@@ -146,8 +130,8 @@ Write-Log -Message "  Value: 0x5944 (hexadecimal) = $ValueDataDec (decimal)" -Le
 Write-Log -Message "  Type:  DWORD" -Level INFO
 Write-Log -Message ""
 
-# STEP 4: Create registry path if needed
-Write-Log -Message "STEP 4: Ensuring Registry Path Exists" -Level SECTION
+# STEP 3: Create registry path if needed
+Write-Log -Message "STEP 3: Ensuring Registry Path Exists" -Level SECTION
 Write-Log -Message "Checking if registry path exists: $RegistryPath" -Level INFO
 if (Test-Path $RegistryPath) {
     Write-Log -Message "SUCCESS: Registry path already exists" -Level SUCCESS
@@ -165,17 +149,17 @@ if (Test-Path $RegistryPath) {
 }
 Write-Log -Message ""
 
-# STEP 5: Set the AvailableUpdates registry value
-Write-Log -Message "STEP 5: Setting AvailableUpdates Registry Value" -Level SECTION
+# STEP 4: Set the AvailableUpdates registry value
+Write-Log -Message "STEP 4: Setting AvailableUpdates Registry Value" -Level SECTION
 Write-Log -Message "This registry value signals Windows to install Secure Boot certificate updates" -Level INFO
 Write-Log -Message ""
 Write-Log -Message "What this value does (0x5944 bitmask):" -Level INFO
-Write-Log -Message "  ✓ Bit 2:  Microsoft Windows Production PCA 2011" -Level INFO
-Write-Log -Message "  ✓ Bit 6:  Microsoft Corporation UEFI CA 2011" -Level INFO
-Write-Log -Message "  ✓ Bit 8:  Windows UEFI CA 2023 (PRIMARY)" -Level INFO
-Write-Log -Message "  ✓ Bit 11: Microsoft UEFI CA 2023" -Level INFO
-Write-Log -Message "  ✓ Bit 12: Microsoft Corporation KEK CA 2023" -Level INFO
-Write-Log -Message "  ✓ Bit 14: Windows UEFI CA (Additional)" -Level INFO
+Write-Log -Message "  [OK] Bit 2:  Microsoft Windows Production PCA 2011" -Level INFO
+Write-Log -Message "  [OK] Bit 6:  Microsoft Corporation UEFI CA 2011" -Level INFO
+Write-Log -Message "  [OK] Bit 8:  Windows UEFI CA 2023 (PRIMARY)" -Level INFO
+Write-Log -Message "  [OK] Bit 11: Microsoft UEFI CA 2023" -Level INFO
+Write-Log -Message "  [OK] Bit 12: Microsoft Corporation KEK CA 2023" -Level INFO
+Write-Log -Message "  [OK] Bit 14: Windows UEFI CA (Additional)" -Level INFO
 Write-Log -Message ""
 Write-Log -Message "Attempting to set registry value..." -Level INFO
 
@@ -200,8 +184,8 @@ try {
 }
 Write-Log -Message ""
 
-# STEP 6: Verify the registry value was set correctly
-Write-Log -Message "STEP 6: Verifying Registry Value" -Level SECTION
+# STEP 5: Verify the registry value was set correctly
+Write-Log -Message "STEP 5: Verifying Registry Value" -Level SECTION
 Write-Log -Message "Reading back the registry value to confirm it was set correctly..." -Level INFO
 try {
     $verifyValue = (Get-ItemProperty -Path $RegistryPath -Name $ValueName -ErrorAction Stop).$ValueName
@@ -210,7 +194,7 @@ try {
         Write-Log -Message "SUCCESS: Verification passed!" -Level SUCCESS
         Write-Log -Message "Registry value confirmed: $verifyValue (decimal) = 0x$($verifyValue.ToString('X')) (hex)" -Level SUCCESS
         Write-Log -Message "Expected value:           $ValueData (decimal) = 0x$($ValueData.ToString('X')) (hex)" -Level INFO
-        Write-Log -Message "✓ Values match - update successful!" -Level SUCCESS
+        Write-Log -Message "[OK] Values match - update successful!" -Level SUCCESS
     } else {
         Write-Log -Message "ERROR: Verification failed - values do not match!" -Level ERROR
         Write-Log -Message "Expected: $ValueData, Got: $verifyValue" -Level ERROR
@@ -224,8 +208,8 @@ try {
 }
 Write-Log -Message ""
 
-# STEP 7: Override Microsoft's Throttle Mechanism
-Write-Log -Message "STEP 7: Bypassing Microsoft's Gradual Rollout Throttle" -Level SECTION
+# STEP 6: Override Microsoft's Throttle Mechanism
+Write-Log -Message "STEP 6: Bypassing Microsoft's Gradual Rollout Throttle" -Level SECTION
 Write-Log -Message "Microsoft uses a throttling mechanism to gradually roll out updates across devices" -Level INFO
 Write-Log -Message "By default, devices may wait days or weeks before being eligible to update" -Level INFO
 Write-Log -Message "We will override this throttle to allow immediate update eligibility" -Level INFO
@@ -294,7 +278,7 @@ try {
 
         Write-Log -Message "SUCCESS: Verification passed!" -Level SUCCESS
         Write-Log -Message "Throttle date now set to: $($verifyDate.ToString('MM/dd/yyyy HH:mm:ss'))" -Level SUCCESS
-        Write-Log -Message "✓ This is in the PAST - device is now eligible for immediate update" -Level SUCCESS
+        Write-Log -Message "[OK] This is in the PAST - device is now eligible for immediate update" -Level SUCCESS
     } catch {
         Write-Log -Message "WARNING: Could not verify throttle override" -Level WARNING
     }
@@ -306,10 +290,10 @@ try {
 Write-Log -Message ""
 
 Write-Log -Message "Why this matters:" -Level INFO
-Write-Log -Message "  • Without override: Windows checks CanAttemptUpdateAfter before updating" -Level INFO
-Write-Log -Message "  • If date is future: Update waits until that date (could be weeks)" -Level INFO
-Write-Log -Message "  • With override: CanAttemptUpdateAfter is in the past" -Level INFO
-Write-Log -Message "  • Result: Device can immediately attempt update on next reboot" -Level SUCCESS
+Write-Log -Message "  - Without override: Windows checks CanAttemptUpdateAfter before updating" -Level INFO
+Write-Log -Message "  - If date is future: Update waits until that date (could be weeks)" -Level INFO
+Write-Log -Message "  - With override: CanAttemptUpdateAfter is in the past" -Level INFO
+Write-Log -Message "  - Result: Device can immediately attempt update on next reboot" -Level SUCCESS
 Write-Log -Message ""
 
 # =============================================================================
@@ -321,16 +305,15 @@ Write-Log -Message "UPDATE SUMMARY" -Level SECTION
 Write-Log -Message "========================================" -Level SECTION
 Write-Log -Message ""
 
-Write-Log -Message "✓ UPDATE COMPLETED SUCCESSFULLY" -Level SUCCESS
+Write-Log -Message "[OK] UPDATE COMPLETED SUCCESSFULLY" -Level SUCCESS
 Write-Log -Message ""
 Write-Log -Message "What was done:" -Level INFO
-Write-Log -Message "  1. ✓ Verified administrator privileges" -Level SUCCESS
-Write-Log -Message "  2. ✓ Checked current Secure Boot configuration" -Level SUCCESS
-Write-Log -Message "  3. ✓ Reviewed current certificate update status" -Level SUCCESS
-Write-Log -Message "  4. ✓ Ensured registry path exists" -Level SUCCESS
-Write-Log -Message "  5. ✓ Set AvailableUpdates = 0x5944" -Level SUCCESS
-Write-Log -Message "  6. ✓ Verified registry value was set correctly" -Level SUCCESS
-Write-Log -Message "  7. ✓ Bypassed Microsoft's throttle mechanism" -Level SUCCESS
+Write-Log -Message "  1. [OK] Checked current Secure Boot configuration" -Level SUCCESS
+Write-Log -Message "  2. [OK] Reviewed current certificate update status" -Level SUCCESS
+Write-Log -Message "  3. [OK] Ensured registry path exists" -Level SUCCESS
+Write-Log -Message "  4. [OK] Set AvailableUpdates = 0x5944" -Level SUCCESS
+Write-Log -Message "  5. [OK] Verified registry value was set correctly" -Level SUCCESS
+Write-Log -Message "  6. [OK] Bypassed Microsoft's throttle mechanism" -Level SUCCESS
 Write-Log -Message ""
 
 Write-Log -Message "========================================" -Level SECTION
@@ -351,9 +334,9 @@ Write-Log -Message "  7. Next detection script run will confirm compliance (Exit
 Write-Log -Message ""
 
 Write-Log -Message "Reboot Options:" -Level INFO
-Write-Log -Message "  • Manual reboot: Restart the device when convenient" -Level INFO
-Write-Log -Message "  • Scheduled reboot: Use Intune or SCCM to schedule a maintenance window" -Level INFO
-Write-Log -Message "  • Immediate reboot: Run 'Restart-Computer -Force' (not recommended during business hours)" -Level INFO
+Write-Log -Message "  - Manual reboot: Restart the device when convenient" -Level INFO
+Write-Log -Message "  - Scheduled reboot: Use Intune or SCCM to schedule a maintenance window" -Level INFO
+Write-Log -Message "  - Immediate reboot: Run 'Restart-Computer -Force' (not recommended during business hours)" -Level INFO
 Write-Log -Message ""
 
 Write-Log -Message "Verification Steps (after reboot):" -Level INFO
