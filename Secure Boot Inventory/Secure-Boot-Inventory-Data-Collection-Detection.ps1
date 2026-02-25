@@ -33,11 +33,10 @@
 # Logging Configuration
 # =============================================================================
 
-# Create timestamped log folder and file
+# Create log folder and file (static location for easier troubleshooting)
 $ScriptName = "Secure-Boot-Inventory-Detection"
-$Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
-$LogFolder = Join-Path -Path "C:\Windows\Temp" -ChildPath "${ScriptName}_${Timestamp}"
-$LogFile = Join-Path -Path $LogFolder -ChildPath "logfile_${Timestamp}.log"
+$LogFolder = Join-Path -Path $env:ProgramData -ChildPath $ScriptName
+$LogFile = Join-Path -Path $LogFolder -ChildPath "Detection.log"
 
 # Create log directory if it doesn't exist
 try {

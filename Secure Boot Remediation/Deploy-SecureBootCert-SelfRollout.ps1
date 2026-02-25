@@ -1,102 +1,9 @@
-<#
-.SYNOPSIS
-    Remediation script that triggers the self-managed Secure Boot certificate update process.
+# Secure Boot Certificate Update - Sets AvailableUpdates=0x5944 and bypasses throttle
 
-.DESCRIPTION
-    This script deploys a registry key that signals Windows to immediately begin updating
-    Secure Boot certificates in the device's UEFI firmware. It is designed to be used as
-    the REMEDIATION component of an Intune Proactive Remediation package.
-
-    When the detection script identifies a device with outdated Secure Boot certificates
-    (UEFICA2023Status ≠ "Updated"), this remediation script executes to initiate the update
-    process by setting a specific registry value that Windows monitors.
-
-WHAT THIS SCRIPT DOES:
-    1. Creates the SecureBoot registry path if it doesn't exist
-    2. Sets the AvailableUpdates registry value to 0x5944 (hexadecimal)
-    3. This value is a BITMASK that tells Windows which certificates to update
-    4. Overrides Microsoft's gradual rollout throttle to allow immediate updates
-
-THE 0x5944 BITMASK EXPLAINED:
-    0x5944 = 22852 (decimal) = 0101 1001 0100 0100 (binary)
-
-    This bitmask instructs Windows to update the following Secure Boot certificate authorities:
-        - Bit 2  (0x0004):  Microsoft Windows Production PCA 2011
-        - Bit 6  (0x0040):  Microsoft Corporation UEFI CA 2011
-        - Bit 8  (0x0100):  Windows UEFI CA 2023
-        - Bit 11 (0x0800):  Microsoft UEFI CA 2023
-        - Bit 12 (0x1000):  Microsoft Corporation KEK CA 2023
-        - Bit 14 (0x4000):  Windows UEFI CA (Additional)
-
-    This combination ensures all required 2023-era certificates are deployed to address:
-        ✓ Certificate expiration (2011 certificates expiring)
-        ✓ BlackLotus bootkit vulnerability mitigation
-        ✓ Future Windows security update compatibility
-
-HOW THE UPDATE PROCESS WORKS:
-    1. Script sets: HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\AvailableUpdates = 0x5944
-    2. Script overrides: CanAttemptUpdateAfter to past date (bypasses Microsoft's throttle)
-    3. Device reboots (required for changes to take effect)
-    4. Windows boot process detects the registry value
-    5. Windows checks CanAttemptUpdateAfter (now in the past = eligible)
-    6. Windows communicates with UEFI firmware to update certificates
-    7. Certificates are installed/updated in the device's firmware
-    8. Windows updates registry: UEFICA2023Status = "Updated"
-    9. Event ID 1801 (success) or 1808 (failure) is logged
-    10. Next detection script run confirms compliance (Exit 0)
-
-DEPLOYMENT METHOD:
-    This implements Microsoft's "Option 3 - Self-Managed Rollout" approach, which:
-        ✓ Allows Windows to handle certificate deployment automatically
-        ✓ Works across all OEM vendors (Dell, HP, Lenovo, etc.)
-        ✓ Requires no manual firmware updates or vendor tools
-        ✓ Is the recommended enterprise deployment method
-        ✓ Requires a reboot to complete the update process
-
-THROTTLE BYPASS:
-    Microsoft uses a gradual rollout mechanism that can delay updates for weeks:
-        • CanAttemptUpdateAfter registry value controls when device can update
-        • By default, this may be set to a future date (e.g., 1-4 weeks out)
-        • This script overrides the throttle to a past date (01/01/2026)
-        • Result: Device becomes immediately eligible for update on next reboot
-        • This ensures consistent, immediate deployment across entire fleet
-        • Without this override, compliance may take weeks to achieve
-
-SYSTEM REQUIREMENTS:
-    - UEFI-based system (not legacy BIOS)
-    - Secure Boot capable hardware
-    - Windows 10 or Windows 11
-    - Administrator privileges to modify registry
-
-INTUNE PROACTIVE REMEDIATION WORKFLOW:
-    Detection Script → Identifies devices with UEFICA2023Status ≠ "Updated" → Exit 1
-    Remediation Script (THIS SCRIPT) → Sets AvailableUpdates = 0x5944 → Exit 0
-    Device Reboots → Windows applies certificate updates → UEFICA2023Status = "Updated"
-    Next Detection Run → Confirms compliance → Exit 0 (no remediation needed)
-
-.NOTES
-    Script Name:  Deploy-SecureBootCert-SelfRollout.ps1
-    Purpose:      Secure Boot certificate update remediation for Intune
-    Exit Code:    Always exits 0 (registry change is non-destructive)
-    Requires:     Administrator privileges
-    Reboot:       Required for changes to take effect
-
-.LINK
-    https://evil365.com/intune/SecureBoot-Cert-Expiration/#option-3---self-managed-rollout-using-intune-policies
-
-.LINK
-    https://support.microsoft.com/en-us/topic/registry-key-updates-for-secure-boot-windows-devices-with-it-managed-updates-a7be69c9-4634-42e1-9ca1-df06f43f360d#bkmk_registry_keys
-#>
-
-# =============================================================================
-# Logging Configuration
-# =============================================================================
-
-# Create timestamped log folder and file
 $ScriptName = "Secure-Boot-Certificate-Update"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
-$LogFolder = Join-Path -Path "C:\Windows\Temp" -ChildPath "${ScriptName}_${Timestamp}"
-$LogFile = Join-Path -Path $LogFolder -ChildPath "logfile_${Timestamp}.log"
+$LogFolder = Join-Path -Path $env:ProgramData -ChildPath $ScriptName
+$LogFile = Join-Path -Path $LogFolder -ChildPath "Remediation.log"
 
 # Create log directory if it doesn't exist
 try {
@@ -125,21 +32,7 @@ function Write-Log {
     $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $LogEntry = "[$Timestamp] [$Level] $Message"
 
-    # Color coding for console output
-    $Color = switch ($Level) {
-        'SUCCESS' { 'Green' }
-        'WARNING' { 'Yellow' }
-        'ERROR'   { 'Red' }
-        'SECTION' { 'Cyan' }
-        default   { 'White' }
-    }
-
-    # Write to console (unless suppressed)
-    if (-not $NoConsole) {
-        Write-Host $LogEntry -ForegroundColor $Color
-    }
-
-    # Write to log file
+    # Write to log file only (no console output to stay under 2048 char Intune limit)
     try {
         Add-Content -Path $LogFile -Value $LogEntry -ErrorAction SilentlyContinue
     } catch {
@@ -175,6 +68,7 @@ if ($isAdmin) {
     Write-Log -Message "Registry modifications require elevated privileges" -Level ERROR
     Write-Log -Message "Please run this script as Administrator" -Level ERROR
     Write-Log -Message "Exiting with error code 1" -Level ERROR
+    Write-Output "ERROR: Not running as Administrator. Log: $LogFile"
     exit 1
 }
 Write-Log -Message ""
@@ -265,6 +159,7 @@ if (Test-Path $RegistryPath) {
     } catch {
         Write-Log -Message "ERROR: Failed to create registry path: $_" -Level ERROR
         Write-Log -Message "Exiting with error code 1" -Level ERROR
+        Write-Output "ERROR: Failed to create registry path. Log: $LogFile"
         exit 1
     }
 }
@@ -300,6 +195,7 @@ try {
     Write-Log -Message "ERROR: Failed to set registry value!" -Level ERROR
     Write-Log -Message "Error details: $_" -Level ERROR
     Write-Log -Message "Exiting with error code 1" -Level ERROR
+    Write-Output "ERROR: Failed to set AvailableUpdates registry value. Log: $LogFile"
     exit 1
 }
 Write-Log -Message ""
@@ -319,6 +215,7 @@ try {
         Write-Log -Message "ERROR: Verification failed - values do not match!" -Level ERROR
         Write-Log -Message "Expected: $ValueData, Got: $verifyValue" -Level ERROR
         Write-Log -Message "Exiting with error code 1" -Level ERROR
+        Write-Output "ERROR: Registry value verification failed. Expected: $ValueData, Got: $verifyValue. Log: $LogFile"
         exit 1
     }
 } catch {
@@ -471,5 +368,6 @@ Write-Log -Message "Completed: $(Get-Date -Format 'dddd, MMMM dd, yyyy HH:mm:ss'
 Write-Log -Message "Log saved to: $LogFile" -Level INFO
 Write-Log -Message "========================================" -Level SECTION
 
-# Exit with success
+# Summary output for Intune (under 2048 chars)
+Write-Output "SUCCESS: Secure Boot certificate update configured. AvailableUpdates=0x5944. Reboot required. Log: $LogFile"
 exit 0
