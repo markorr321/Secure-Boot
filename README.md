@@ -60,6 +60,12 @@ These scripts automate the detection and remediation of outdated Secure Boot cer
 6. Verifies registry value was set correctly
 7. Bypasses Microsoft's throttle mechanism (sets CanAttemptUpdateAfter to past date)
 
+### 📁 Sample Reports
+- `Sample-Secure-Boot-Report.csv` — Sample CSV export with 500 device records
+- `Sample-SecureBootReport.html` / `Sample-SecureBootReport-2.html` — Sample interactive HTML dashboards
+
+> **Note:** All device names, Entra device IDs, and other device-specific data in the sample files are synthetic and randomly generated. No real device or organizational data is included.
+
 ## Key Features
 
 - **🚀 Throttle Bypass**: Overrides `CanAttemptUpdateAfter` to enable immediate updates (no waiting for Microsoft's rollout)
