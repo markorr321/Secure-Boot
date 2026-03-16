@@ -152,8 +152,8 @@ $pctSbEnabled = if ($parsedCount -gt 0) { [math]::Round(($sbEnabled / $parsedCou
 # UEFI CA 2023 Status
 $statusNotStarted = ($devices | Where-Object { $_.UEFICA2023Status -eq "NotStarted" }).Count
 $statusStaged = ($devices | Where-Object { $_.UEFICA2023Status -eq "Staged" }).Count
-$statusApplied = ($devices | Where-Object { $_.UEFICA2023Status -eq "Applied" }).Count
-$pctApplied = if ($parsedCount -gt 0) { [math]::Round(($statusApplied / $parsedCount) * 100, 1) } else { 0 }
+$statusUpdated = ($devices | Where-Object { $_.UEFICA2023Status -eq "Updated" }).Count
+$pctUpdated = if ($parsedCount -gt 0) { [math]::Round(($statusUpdated / $parsedCount) * 100, 1) } else { 0 }
 
 # WinCS Key Status
 $winCSApplied = ($devices | Where-Object { $_.WinCSKeyApplied -eq $true }).Count
@@ -170,7 +170,7 @@ $underObservation = ($devices | Where-Object { $_.Confidence -match "Under Obser
 
 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Statistics calculated:" -ForegroundColor Cyan
 Write-Host "  Secure Boot Enabled: $sbEnabled ($pctSbEnabled%)" -ForegroundColor Gray
-Write-Host "  UEFI CA 2023 Applied: $statusApplied ($pctApplied%)" -ForegroundColor Gray
+Write-Host "  UEFI CA 2023 Updated: $statusUpdated ($pctUpdated%)" -ForegroundColor Gray
 Write-Host "  WinCS Key Applied: $winCSApplied ($pctWinCSApplied%)" -ForegroundColor Gray
 Write-Host "  Reboot Pending: $rebootPending ($pctRebootPending%)" -ForegroundColor Gray
 
@@ -184,9 +184,9 @@ foreach ($device in $devices) {
                elseif ($device.SecureBootEnabled -eq $false) { "disabled" } 
                else { "unknown" }
     
-    $statusClass = if ($device.UEFICA2023Status -eq "Applied") { "enabled" } 
+    $statusClass = if ($device.UEFICA2023Status -eq "Updated") { "enabled" }
                    elseif ($device.UEFICA2023Status -eq "Staged") { "warning" }
-                   elseif ($device.UEFICA2023Status -eq "NotStarted") { "disabled" } 
+                   elseif ($device.UEFICA2023Status -eq "NotStarted") { "disabled" }
                    else { "unknown" }
     
     $winCSClass = if ($device.WinCSKeyApplied -eq $true) { "enabled" } 
@@ -208,16 +208,16 @@ foreach ($device in $devices) {
     [void]$sb.AppendLine("<tr data-json='$base64Json'>")
     [void]$sb.Append("<td>$($device.Hostname)</td>")
     [void]$sb.Append("<td><span class='badge-$sbClass'>$(if($device.SecureBootEnabled){'Enabled'}else{'Disabled'})</span></td>")
-    [void]$sb.Append("<td><span class='badge-$statusClass'>$($device.UEFICA2023Status)</span></td>")
-    [void]$sb.Append("<td><span class='badge-$confidenceClass'>$($device.Confidence)</span></td>")
     [void]$sb.Append("<td><span class='badge-$winCSClass'>$(if($device.WinCSKeyApplied){'Installed'}else{'Not Installed'})</span></td>")
+    [void]$sb.Append("<td><span class='badge-$statusClass'>$($device.UEFICA2023Status)</span></td>")
+    [void]$sb.Append("<td><span class='badge-$taskClass'>$(if($device.SecureBootTaskStatus -eq 'Ready'){'Yes'}else{'No'})</span></td>")
     [void]$sb.Append("<td><span class='badge-$rebootClass'>$(if($device.RebootPending){'Yes'}else{'No'})</span></td>")
+    [void]$sb.Append("<td><span class='badge-$confidenceClass'>$($device.Confidence)</span></td>")
     [void]$sb.Append("<td>$($device.LatestEventId)</td>")
     [void]$sb.Append("<td>$($device.Manufacturer)</td>")
     [void]$sb.Append("<td>$($device.Model)</td>")
     [void]$sb.Append("<td>$($device.OSVersion)</td>")
     [void]$sb.Append("<td>$($device.FirmwareVersion)</td>")
-    [void]$sb.Append("<td><span class='badge-$taskClass'>$(if($device.SecureBootTaskStatus -eq 'Ready'){'Yes'}else{'No'})</span></td>")
     [void]$sb.Append("<td>$($device.CollectionTime)</td>")
     [void]$sb.Append("<td><button class='btn btn-detail' onclick='showDetail(this)'>View</button></td>")
     [void]$sb.AppendLine("</tr>")
@@ -338,10 +338,10 @@ $html = @"
         <div class="stats-card">
             <h3>Update Progress</h3>
             <div class="stat-row">
-                <span class="stat-label">Completed</span>
-                <span class="stat-value green">$statusApplied <small>($pctApplied%)</small></span>
+                <span class="stat-label">Updated</span>
+                <span class="stat-value green">$statusUpdated <small>($pctUpdated%)</small></span>
             </div>
-            <div class="stat-bar"><div class="stat-bar-fill green" style="width: $pctApplied%"></div></div>
+            <div class="stat-bar"><div class="stat-bar-fill green" style="width: $pctUpdated%"></div></div>
             <div class="stat-row">
                 <span class="stat-label">In Progress</span>
                 <span class="stat-value orange">$statusStaged</span>
@@ -397,17 +397,7 @@ $html = @"
                     <option value="false">Disabled</option>
                 </select>
             </div>
-            
-            <div class="filter-group">
-                <label>Update Status:</label>
-                <select id="statusFilter">
-                    <option value="all">All</option>
-                    <option value="applied">Completed</option>
-                    <option value="staged">In Progress</option>
-                    <option value="notstarted">Not Started</option>
-                </select>
-            </div>
-            
+
             <div class="filter-group">
                 <label>2023 Cert:</label>
                 <select id="wincsFilter">
@@ -416,7 +406,17 @@ $html = @"
                     <option value="not installed">Not Installed</option>
                 </select>
             </div>
-            
+
+            <div class="filter-group">
+                <label>Update Status:</label>
+                <select id="statusFilter">
+                    <option value="all">All</option>
+                    <option value="updated">Updated</option>
+                    <option value="staged">In Progress</option>
+                    <option value="notstarted">Not Started</option>
+                </select>
+            </div>
+
             <div class="filter-group">
                 <label>Reboot:</label>
                 <select id="rebootFilter">
@@ -435,16 +435,16 @@ $html = @"
                     <tr>
                         <th onclick="sort(this)">Device</th>
                         <th onclick="sort(this)">Secure Boot</th>
-                        <th onclick="sort(this)">Update Status</th>
-                        <th onclick="sort(this)">Rollout Status</th>
                         <th onclick="sort(this)">2023 Cert</th>
+                        <th onclick="sort(this)">Update Status</th>
+                        <th onclick="sort(this)">Task Ready</th>
                         <th onclick="sort(this)">Reboot Needed</th>
+                        <th onclick="sort(this)">Rollout Status</th>
                         <th onclick="sort(this)">Last Event</th>
                         <th onclick="sort(this)">Manufacturer</th>
                         <th onclick="sort(this)">Model</th>
                         <th onclick="sort(this)">OS Version</th>
                         <th onclick="sort(this)">BIOS Version</th>
-                        <th onclick="sort(this)">Task Ready</th>
                         <th onclick="sort(this)">Collected</th>
                         <th>Details</th>
                     </tr>
@@ -469,10 +469,10 @@ $html = @"
 </div>
 
 <script>
-// Column indices (0-based) - updated for new column layout
+// Column indices (0-based) - Device | Secure Boot | 2023 Cert | Update Status | Task Ready | Reboot | Rollout Status | ...
 const COL_SECURE_BOOT = 1;
-const COL_UEFI_STATUS = 2;
-const COL_WINCS_KEY = 4;
+const COL_WINCS_KEY = 2;
+const COL_UEFI_STATUS = 3;
 const COL_REBOOT = 5;
 
 // Event listeners
