@@ -48,7 +48,7 @@ param(
 # =============================================================================
 
 # Create log folder and file
-$ScriptName = "PAM - Secure Boot - Cert Update Status Detection"
+$ScriptName = "PAR - Secure Boot - Cert Update Status Detection"
 $LogFolder = Join-Path -Path $env:ProgramData -ChildPath $ScriptName
 $LogFile = Join-Path -Path $LogFolder -ChildPath "Detection.log"
 

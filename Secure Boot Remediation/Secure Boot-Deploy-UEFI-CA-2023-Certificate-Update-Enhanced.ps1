@@ -1,4 +1,5 @@
-﻿# Secure Boot Certificate Update - Sets AvailableUpdates=0x5944 and bypasses throttle
+# Secure Boot Certificate Update (Enhanced) - Sets AvailableUpdates=0x5944 and bypasses throttle
+# Outputs JSON status to Intune for structured reporting
 
 $ScriptName = "PAR - Secure Boot - Deploy UEFI CA 2023 Certificate Update"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
@@ -40,9 +41,54 @@ function Write-Log {
     }
 }
 
+# JSON output function for Intune
+function Write-IntuneOutput {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Status,
+        
+        [Parameter(Mandatory=$false)]
+        [string]$ErrorMessage = $null,
+        
+        [Parameter(Mandatory=$false)]
+        [string]$ErrorDetails = $null,
+        
+        [Parameter(Mandatory=$false)]
+        [int]$ExitCode = 0
+    )
+    
+    $output = [ordered]@{
+        Status                    = $Status
+        Hostname                  = $env:COMPUTERNAME
+        Timestamp                 = (Get-Date).ToString("o")
+        Action                    = "CertificateUpdateConfigured"
+        AvailableUpdates          = if ($script:registryValueSet) { "0x5944" } else { $null }
+        AvailableUpdatesVerified  = $script:registryValueVerified
+        ThrottleBypassed          = $script:throttleBypassed
+        RebootRequired            = ($Status -eq "SUCCESS")
+        SecureBootEnabled         = $script:secureBootEnabled
+        PreviousUEFICA2023Status  = $script:previousStatus
+        ErrorMessage              = $ErrorMessage
+        ErrorDetails              = $ErrorDetails
+        LogFile                   = $LogFile
+    }
+    
+    # Output JSON for Intune (compressed to stay under 2048 chars)
+    Write-Output ($output | ConvertTo-Json -Compress)
+    Write-Log -Message "JSON Output: $($output | ConvertTo-Json -Compress)" -Level INFO
+    exit $ExitCode
+}
+
+# Initialize tracking variables
+$script:secureBootEnabled = $null
+$script:previousStatus = $null
+$script:registryValueSet = $false
+$script:registryValueVerified = $false
+$script:throttleBypassed = $false
+
 # Initialize log file
 Write-Log -Message "========================================" -Level SECTION
-Write-Log -Message "Secure Boot Certificate Update Script" -Level SECTION
+Write-Log -Message "Secure Boot Certificate Update Script (Enhanced)" -Level SECTION
 Write-Log -Message "Started: $(Get-Date -Format 'dddd, MMMM dd, yyyy HH:mm:ss')" -Level SECTION
 Write-Log -Message "Log File: $LogFile" -Level INFO
 Write-Log -Message "========================================" -Level SECTION
@@ -60,8 +106,8 @@ Write-Log -Message ""
 # Check 1: Check current Secure Boot status
 Write-Log -Message "STEP 1: Checking Current Secure Boot Configuration" -Level SECTION
 try {
-    $secureBootEnabled = Confirm-SecureBootUEFI -ErrorAction Stop
-    if ($secureBootEnabled) {
+    $script:secureBootEnabled = Confirm-SecureBootUEFI -ErrorAction Stop
+    if ($script:secureBootEnabled) {
         Write-Log -Message "SUCCESS: Secure Boot is currently ENABLED" -Level SUCCESS
         Write-Log -Message "This device is capable of receiving Secure Boot certificate updates" -Level INFO
     } else {
@@ -72,16 +118,17 @@ try {
     Write-Log -Message "WARNING: Cannot determine Secure Boot status" -Level WARNING
     Write-Log -Message "This system may not support UEFI Secure Boot" -Level WARNING
     Write-Log -Message "Proceeding with registry modification anyway..." -Level INFO
+    $script:secureBootEnabled = $null
 }
 Write-Log -Message ""
 
 # Check 2: Check if update is already pending or completed
 Write-Log -Message "STEP 2: Checking Current Certificate Update Status" -Level SECTION
 try {
-    $currentStatus = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" -Name UEFICA2023Status -ErrorAction Stop).UEFICA2023Status
-    Write-Log -Message "Current UEFI CA 2023 Status: $currentStatus" -Level INFO
+    $script:previousStatus = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" -Name UEFICA2023Status -ErrorAction Stop).UEFICA2023Status
+    Write-Log -Message "Current UEFI CA 2023 Status: $($script:previousStatus)" -Level INFO
 
-    switch ($currentStatus) {
+    switch ($script:previousStatus) {
         "Updated" {
             Write-Log -Message "INFO: Certificates are already UPDATED" -Level INFO
             Write-Log -Message "This update may not be necessary, but will proceed to ensure consistency" -Level INFO
@@ -99,12 +146,13 @@ try {
             Write-Log -Message "This script will retry the certificate update" -Level INFO
         }
         default {
-            Write-Log -Message "Status: $currentStatus (unknown state)" -Level WARNING
+            Write-Log -Message "Status: $($script:previousStatus) (unknown state)" -Level WARNING
         }
     }
 } catch {
     Write-Log -Message "INFO: UEFICA2023Status registry key does not exist yet" -Level INFO
     Write-Log -Message "This is normal for devices that haven't attempted the update" -Level INFO
+    $script:previousStatus = "NotFound"
 }
 Write-Log -Message ""
 
@@ -143,8 +191,7 @@ if (Test-Path $RegistryPath) {
     } catch {
         Write-Log -Message "ERROR: Failed to create registry path: $_" -Level ERROR
         Write-Log -Message "Exiting with error code 1" -Level ERROR
-        Write-Output "ERROR: Failed to create registry path. Log: $LogFile"
-        exit 1
+        Write-IntuneOutput -Status "ERROR" -ErrorMessage "Failed to create registry path" -ErrorDetails $_.Exception.Message -ExitCode 1
     }
 }
 Write-Log -Message ""
@@ -166,6 +213,7 @@ Write-Log -Message "Attempting to set registry value..." -Level INFO
 try {
     # Set the registry value
     $result = New-ItemProperty -Path $RegistryPath -Name $ValueName -PropertyType DWord -Value $ValueData -Force -ErrorAction Stop
+    $script:registryValueSet = $true
 
     Write-Log -Message "SUCCESS: Registry value set successfully!" -Level SUCCESS
     Write-Log -Message ""
@@ -179,8 +227,7 @@ try {
     Write-Log -Message "ERROR: Failed to set registry value!" -Level ERROR
     Write-Log -Message "Error details: $_" -Level ERROR
     Write-Log -Message "Exiting with error code 1" -Level ERROR
-    Write-Output "ERROR: Failed to set AvailableUpdates registry value. Log: $LogFile"
-    exit 1
+    Write-IntuneOutput -Status "ERROR" -ErrorMessage "Failed to set AvailableUpdates registry value" -ErrorDetails $_.Exception.Message -ExitCode 1
 }
 Write-Log -Message ""
 
@@ -191,6 +238,7 @@ try {
     $verifyValue = (Get-ItemProperty -Path $RegistryPath -Name $ValueName -ErrorAction Stop).$ValueName
 
     if ($verifyValue -eq $ValueData) {
+        $script:registryValueVerified = $true
         Write-Log -Message "SUCCESS: Verification passed!" -Level SUCCESS
         Write-Log -Message "Registry value confirmed: $verifyValue (decimal) = 0x$($verifyValue.ToString('X')) (hex)" -Level SUCCESS
         Write-Log -Message "Expected value:           $ValueData (decimal) = 0x$($ValueData.ToString('X')) (hex)" -Level INFO
@@ -199,8 +247,7 @@ try {
         Write-Log -Message "ERROR: Verification failed - values do not match!" -Level ERROR
         Write-Log -Message "Expected: $ValueData, Got: $verifyValue" -Level ERROR
         Write-Log -Message "Exiting with error code 1" -Level ERROR
-        Write-Output "ERROR: Registry value verification failed. Expected: $ValueData, Got: $verifyValue. Log: $LogFile"
-        exit 1
+        Write-IntuneOutput -Status "ERROR" -ErrorMessage "Registry value verification failed" -ErrorDetails "Expected: $ValueData, Got: $verifyValue" -ExitCode 1
     }
 } catch {
     Write-Log -Message "ERROR: Failed to verify registry value: $_" -Level ERROR
@@ -265,6 +312,7 @@ Write-Log -Message "Setting CanAttemptUpdateAfter to past date (01/01/2026)..." 
 try {
     $PastDate = [DateTime]::new(2026, 1, 1).ToFileTimeUtc()
     Set-ItemProperty -Path $ThrottlePath -Name $ThrottleName -Value $PastDate -Type QWord -Force -ErrorAction Stop
+    $script:throttleBypassed = $true
 
     Write-Log -Message "SUCCESS: Throttle override applied!" -Level SUCCESS
     Write-Log -Message ""
@@ -351,6 +399,5 @@ Write-Log -Message "Completed: $(Get-Date -Format 'dddd, MMMM dd, yyyy HH:mm:ss'
 Write-Log -Message "Log saved to: $LogFile" -Level INFO
 Write-Log -Message "========================================" -Level SECTION
 
-# Summary output for Intune (under 2048 chars)
-Write-Output "SUCCESS: Secure Boot certificate update configured. AvailableUpdates=0x5944. Reboot required. Log: $LogFile"
-exit 0
+# Output JSON status for Intune (under 2048 chars)
+Write-IntuneOutput -Status "SUCCESS" -ExitCode 0

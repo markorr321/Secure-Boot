@@ -48,7 +48,7 @@ param(
 # =============================================================================
 
 # Create timestamped log folder and file
-$ScriptName = "PAM - Secure Boot - UEFI CA 2023 Inventory Collection"
+$ScriptName = "PAR - Secure Boot - UEFI CA 2023 Inventory Collection"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $LogFolder = Join-Path -Path $env:ProgramData -ChildPath $ScriptName
 $LogFile = Join-Path -Path $LogFolder -ChildPath "Detection.log"

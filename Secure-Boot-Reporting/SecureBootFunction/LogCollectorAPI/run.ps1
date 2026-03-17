@@ -18,36 +18,40 @@ if (-not $azureADDeviceID -or -not $azureADTenantID -or -not $logPayloads) {
 }
 
 # --- Device Validation via Microsoft Graph ---
-try {
-    $graphTokenResult = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com"
-    if ($graphTokenResult.Token -is [securestring]) {
-        $graphToken = $graphTokenResult.Token | ConvertFrom-SecureString -AsPlainText
-    } else {
-        $graphToken = $graphTokenResult.Token
-    }
-    $graphHeaders = @{
-        "Authorization" = "Bearer $graphToken"
-        "Content-Type"  = "application/json"
-    }
-    $graphUri = "https://graph.microsoft.com/v1.0/devices?`$filter=deviceId eq '$azureADDeviceID'"
-    $deviceLookup = Invoke-RestMethod -Uri $graphUri -Headers $graphHeaders -Method GET
+# Set SKIP_DEVICE_VALIDATION=true in Function App settings to bypass Graph validation during testing
+$skipDeviceValidation = $env:SKIP_DEVICE_VALIDATION -eq "true"
+if (-not $skipDeviceValidation) {
+    try {
+        $graphTokenResult = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com"
+        if ($graphTokenResult.Token -is [securestring]) {
+            $graphToken = $graphTokenResult.Token | ConvertFrom-SecureString -AsPlainText
+        } else {
+            $graphToken = $graphTokenResult.Token
+        }
+        $graphHeaders = @{
+            "Authorization" = "Bearer $graphToken"
+            "Content-Type"  = "application/json"
+        }
+        $graphUri = "https://graph.microsoft.com/v1.0/devices?`$filter=deviceId eq '$azureADDeviceID'"
+        $deviceLookup = Invoke-RestMethod -Uri $graphUri -Headers $graphHeaders -Method GET
 
-    if ($deviceLookup.value.Count -eq 0) {
+        if ($deviceLookup.value.Count -eq 0) {
+            Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+                StatusCode = [HttpStatusCode]::Unauthorized
+                Body = "Device not found in Azure AD: $azureADDeviceID"
+            })
+            return
+        }
+    }
+    catch {
+        $errorDetail = $_.Exception.Message
+        if ($_.ErrorDetails.Message) { $errorDetail += " | Details: $($_.ErrorDetails.Message)" }
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::Unauthorized
-            Body = "Device not found in Azure AD: $azureADDeviceID"
+            StatusCode = [HttpStatusCode]::InternalServerError
+            Body = "Device validation failed: $errorDetail"
         })
         return
     }
-}
-catch {
-    $errorDetail = $_.Exception.Message
-    if ($_.ErrorDetails.Message) { $errorDetail += " | Details: $($_.ErrorDetails.Message)" }
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-        StatusCode = [HttpStatusCode]::InternalServerError
-        Body = "Device validation failed: $errorDetail"
-    })
-    return
 }
 
 # --- Send to Logs Ingestion API ---
